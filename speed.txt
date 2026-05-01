@@ -1,9 +1,9 @@
 Total pages: 1,597
 
 speed optmizations:
-1) Bump VLM_CONCURRENCY from 4 → 8 or 12 in cell 4. The bottleneck is network I/O, not CPU, so threads scale well past core count. Could roughly halve wall-clock.
-2) Switch VLM_MODEL = "Gemma 3 4B" in cell 4 (keep 12B as fallback). 4B is ~2-3× faster per call and the prompt is well-structured enough that accuracy loss should be small. Could roughly halve wall-clock.
-
-is it cached?
+1) Bump VLM_CONCURRENCY from 4 → 8 or 12 in cell 4. The bottleneck is network I/O, not CPU, 
+so threads scale well past core count.
+2) Switch VLM_MODEL = "Gemma 3 4B" in cell 4 (keep 12B as fallback). 4B is ~2-3× faster per call and the prompt is 
+well-structured enough that accuracy loss should be small.
 
 nemotron with gemma 3 12b as backup / current setup / gemma 3 4b
