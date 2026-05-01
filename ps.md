@@ -68,7 +68,7 @@ Bottom line: **real-world data is not clean tables**. Treat every document as a 
 
 ## Required Output Contract
 
-`ps-1.txt` defines the evaluation output. The output must be a JSON array of objects, one object per page/document page analyzed.
+The output must be a JSON array of objects, one object per page/document page analyzed.
 
 Important rules:
 
@@ -459,7 +459,6 @@ Awards to the top 3 teams by overall score. Minimum qualification score: **>= 70
 
 ## Notes
 
-- Treat `ps-1.txt` as the source of truth for the strict output schema.
 - Keep package-specific keys exactly as expected by the evaluator.
 - Preserve provenance for each field and rule check internally, even if the submitted JSON only requires binary/document-rank fields.
 - Conditional cases should be surfaced for human review with the uncertain field, confidence, source page, and extracted evidence.
