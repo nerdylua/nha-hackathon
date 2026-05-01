@@ -6,6 +6,6 @@ speed optmizations:
 
 is it cached?
 
-sub agents to verify accuracy of code (w.r.t skeleton and ps.md) and how to improve accuracy for our dataset
+accuracy buffs(kick subagents again)
 
 nemotron with gemma 3 12b as backup
