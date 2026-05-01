@@ -7,5 +7,3 @@ speed optmizations:
 is it cached?
 
 nemotron with gemma 3 12b as backup / current setup / gemma 3 4b
-
-correct the format
