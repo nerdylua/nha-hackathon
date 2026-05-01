@@ -48,6 +48,24 @@ File types observed: `245` PDFs, `120` JPGs, and `69` JPEGs.
 - Temporal validation by assigning `document_rank` to pages/documents according to the clinical episode sequence.
 - Human-in-the-loop review support for uncertain or Conditional cases.
 
+## Real-World Data Challenges
+
+This challenge is not just an OCR task. Healthcare claim documents are designed for human review, not machine parsing, so the solution must perform full document understanding across text, layout, images, and clinical timeline evidence.
+
+Key sources of difficulty:
+
+| Challenge | What It Means for the Solution |
+|:----------|:-------------------------------|
+| Document heterogeneity | Claims may contain discharge summaries, prescriptions, invoices, lab reports, imaging reports, indoor case papers, operative notes, photos, and unrelated extras. |
+| Quality variation | Inputs may be scanned, photographed, photocopied, blurred, skewed, shadowed, compressed, overexposed, underexposed, or partially cropped. |
+| Format variation | Inputs include PDFs, images, and multi-page bundles where one file can contain several document types. |
+| Language variation | Text may be in English plus Indian languages, and may mix printed and handwritten content. |
+| Layout complexity | Important evidence may appear in tables, stamps, signatures, stickers, headers, handwritten notes, report images, invoices, or page margins. |
+| Temporal reasoning | Fraud and inconsistency detection depends on reconstructing the episode timeline, not just detecting isolated keywords. |
+| Explainability | Every major prediction or rule outcome should be traceable to source page, text span, bounding box, confidence, or visual region wherever possible. |
+
+Bottom line: **real-world data is not clean tables**. Treat every document as a noisy clinical artifact that needs normalization, extraction, structure, validation, and provenance.
+
 ## Required Output Contract
 
 `ps-1.txt` defines the evaluation output. The output must be a JSON array of objects, one object per page/document page analyzed.
@@ -293,13 +311,83 @@ Package-specific ranking may vary slightly, but the rank must remain chronologic
 ## Suggested Solution Components
 
 - **Document intake**: Recursively ingest all files under `Claims/<procedure_code>/<case_id>/`.
-- **OCR and layout understanding**: Extract text while preserving page structure, tables, stamps, headers, dates, and report sections.
+- **Format normalization**: Convert PDFs to page images, split multi-page bundles, assign stable file/page identifiers, and process each page independently before aggregating document-level decisions.
+- **Image preprocessing**: Apply lightweight denoising, contrast enhancement, deskewing, binarization, and blur/quality checks before OCR when useful.
+- **OCR and layout understanding**: Extract text while preserving page structure, reading order, tables, stamps, headers, dates, and report sections.
 - **Document classification**: Classify each page/document into package-specific mandatory document categories or `extra_document`.
 - **Visual detection**: Detect visual evidence needed by package, especially photos, post-op X-rays, implant evidence, invoices, stamps, signatures, and stickers.
 - **Data structuring**: Normalize extracted values into the package-specific JSON schema.
 - **Rules engine**: Encode STG/policy checks for each package code.
 - **Timeline builder**: Assign `document_rank`, propagate rank across pages of the same document, and flag temporal inconsistencies.
 - **Decisioning and explainability**: Produce Pass / Conditional / Fail internally or in a companion report, with reasons and evidence pointers.
+
+## Data Processing Pipeline Guidance
+
+Design a pipeline, not a single model. A reliable approach should separate document handling, page cleanup, OCR, layout parsing, visual detection, semantic extraction, rule checks, and output validation.
+
+Recommended pipeline:
+
+| Stage | Purpose | Practical Notes |
+|:------|:--------|:----------------|
+| 1. Document intake | Discover files and normalize inputs | Convert PDFs to images, process page by page, preserve original file path and page number. |
+| 2. Image preprocessing | Improve OCR and visual detection | Use denoising, deblurring where feasible, contrast enhancement, deskewing, and binarization. Keep original images for visual evidence checks. |
+| 3. OCR/text extraction | Get page text and confidences | OCR should return text, bounding boxes, page number, and confidence. Flag low-confidence pages as poor quality. |
+| 4. Layout understanding | Recover document structure | Maintain reading order, detect tables/sections, handle headers/footers, and avoid flattening important tabular evidence into unusable text. |
+| 5. Visual cue detection | Identify non-text evidence | Detect stamps, signatures, photos, invoices, stickers, report images, QR/barcodes, implants, and post-op X-rays where relevant. |
+| 6. Semantic extraction | Map evidence to schema fields | Use package-specific keywords, clinical synonyms, dates, age, test values, and STG concept matching. |
+| 7. Timeline construction | Rebuild clinical episode sequence | Use document type, dates, and package expectations to assign ranks and detect suspicious ordering. |
+| 8. Rule engine | Evaluate STG compliance | Convert extracted evidence into package-specific binary flags, date fields, and internal Pass / Conditional / Fail decisions. |
+| 9. Provenance and review | Make results explainable | Store evidence snippets, coordinates, confidence, page IDs, and reasons for uncertain decisions. |
+| 10. Strict export | Produce evaluator-ready JSON | Validate exact keys, key order, binary values, date formats, null handling, and package code. |
+
+The core extraction principle is: **extract structure, not just text**. For each meaningful evidence item, store at least:
+
+```text
+(text, location/bounding_box, page_number, source_file, confidence)
+```
+
+This provenance can live in internal objects or companion reports even when the final strict JSON only accepts binary flags and dates.
+
+## Suggested Offline Tools and Models
+
+The hackathon environment should be treated as offline/local: no external APIs. All processing should run inside the notebook environment using installed packages, bundled assets, or locally available models.
+
+Useful components to consider:
+
+| Area | Candidate Tools / Models |
+|:-----|:--------------------------|
+| OCR and multilingual text | Tesseract OCR, OCR-capable local vision-language models, multilingual OCR checkpoints if available. |
+| Layout understanding | LayoutLM-style models, Donut-style document understanding, Detectron2/table detectors, rule-based layout blocks from OCR boxes. |
+| Visual detection | OpenCV, classical image processing, object detection models for stamps/signatures/photos, ZBar or OpenCV for QR/barcodes. |
+| NLP and structuring | spaCy, Hugging Face Transformers, regex/rule dictionaries, local embedding/classification models. |
+| Clinical semantics | SNOMED CT / ICD-style synonym dictionaries where available, package-specific STG term lists, abbreviation expansion. |
+| Orchestration | Modular Python functions, batch processing, cached intermediate artifacts, async or multiprocessing only where memory allows. |
+| Local LLM/VLM assistance | Ministral 3B/9B, Gemma 3 4B/12B, and Nemotron Nano 30B multimodal if provided by the environment. |
+
+Because scoring emphasizes classification and rule/provenance F1, prefer a dependable hybrid system over a purely generative one:
+
+- OCR/layout/visual detectors produce evidence candidates.
+- Package-specific rules and dictionaries convert evidence into strict fields.
+- Local LLM/VLM models can help classify difficult pages, interpret messy snippets, or adjudicate uncertain cases.
+- Validation code enforces schema correctness and prevents malformed output.
+
+## Sandbox Constraints
+
+Expected hardware limits:
+
+| Resource | Request | Limit |
+|:---------|:--------|:------|
+| CPU | 4 cores | 6 cores |
+| Memory | 10 GiB | 12 GiB |
+
+Design implications:
+
+- Cache expensive page renders, OCR output, and intermediate JSON so repeated notebook runs do not recompute everything.
+- Prefer small/local models first; use larger multimodal models only for hard pages or uncertain classifications.
+- Process documents in batches and release images/model tensors promptly to stay within memory limits.
+- Avoid loading several large models at once.
+- Keep preprocessing lightweight and deterministic where possible.
+- Add fallbacks: if OCR confidence is low, mark `poor_quality`, preserve provenance, and route the page to Conditional review instead of silently guessing.
 
 ## Notebook Implementation Context
 
