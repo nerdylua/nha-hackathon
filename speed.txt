@@ -9,3 +9,5 @@ is it cached?
 nemotron with gemma 3 12b as backup / current setup / gemma 3 4b
 
 correct the format
+
+rename main.ipynb to the format in the sandbox
